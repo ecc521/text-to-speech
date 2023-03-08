@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Set;
+import java.util.Comparator;
 
 public class TextToSpeech implements android.speech.tts.TextToSpeech.OnInitListener {
 
@@ -39,12 +40,16 @@ public class TextToSpeech implements android.speech.tts.TextToSpeech.OnInitListe
         this.initializationStatus = status;
     }
 
+
+
+
     public void speak(
         String text,
         String lang,
         float rate,
         float pitch,
         float volume,
+        int voice,
         String callbackId,
         SpeakResultCallback resultCallback
     ) {
@@ -76,6 +81,16 @@ public class TextToSpeech implements android.speech.tts.TextToSpeech.OnInitListe
             tts.setLanguage(locale);
             tts.setSpeechRate(rate);
             tts.setPitch(pitch);
+
+            if (voice >= 0) {
+                ArrayList<Voice> supportedVoices = getSupportedVoicesOrdered();
+                if (voice < supportedVoices.size()) {
+                    Voice newVoice = supportedVoices.get(voice);
+                    int resultCode = tts.setVoice(newVoice);
+                }
+            }
+
+            
             tts.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, ttsParams, callbackId);
         } else {
             HashMap<String, String> ttsParams = new HashMap<>();
@@ -104,9 +119,22 @@ public class TextToSpeech implements android.speech.tts.TextToSpeech.OnInitListe
         return result;
     }
 
+    public ArrayList<Voice> getSupportedVoicesOrdered() {
+        Set<Voice> supportedVoices = tts.getVoices();
+        ArrayList<Voice> orderedVoices = new ArrayList<Voice>();
+        for (Voice supportedVoice : supportedVoices) {
+            orderedVoices.add(supportedVoice);
+        }
+
+        Comparator<Voice> voiceComparator = Comparator.comparing(v -> v.hashCode());
+        orderedVoices.sort(voiceComparator);
+
+        return orderedVoices;
+    }
+
     public JSArray getSupportedVoices() {
         ArrayList<JSObject> voices = new ArrayList<>();
-        Set<Voice> supportedVoices = tts.getVoices();
+        ArrayList<Voice> supportedVoices = getSupportedVoicesOrdered();
         for (Voice supportedVoice : supportedVoices) {
             JSObject obj = this.convertVoiceToJSObject(supportedVoice);
             voices.add(obj);
@@ -153,7 +181,7 @@ public class TextToSpeech implements android.speech.tts.TextToSpeech.OnInitListe
         Locale locale = voice.getLocale();
         JSObject obj = new JSObject();
         obj.put("voiceURI", voice.getName());
-        obj.put("name", locale.getDisplayLanguage() + " " + locale.getDisplayCountry());
+        obj.put("name", locale.getDisplayLanguage() + " " + locale.getDisplayCountry() + " " + voice.getName());
         obj.put("lang", locale.toLanguageTag());
         obj.put("localService", !voice.isNetworkConnectionRequired());
         obj.put("default", false);
